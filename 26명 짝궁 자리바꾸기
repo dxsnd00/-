@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>자리 뽑기</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 900px;
+            width: 100%;
+            background-color: #ffffff;
+            border-radius: 1rem;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            padding: 2rem;
+        }
+        .seat {
+            width: 80px;
+            height: 80px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 0.5rem;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #ffffff;
+            transition: transform 0.2s ease-in-out;
+            border: 2px solid rgba(0, 0, 0, 0.1);
+        }
+        .seat:hover {
+            transform: scale(1.05);
+        }
+        .empty-seat {
+            background-color: #e5e7eb;
+            color: #9ca3af;
+            font-size: 1rem;
+            border-style: dashed;
+        }
+        .paired-seat {
+            border: 3px solid white;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="text-3xl font-bold text-center mb-6 text-gray-800">자리 뽑기 프로그램</h1>
+        <p class="text-center text-gray-600 mb-8">버튼을 눌러서 자리를 랜덤으로 뽑아보세요!</p>
+
+        <div id="seat-map" class="grid grid-cols-6 gap-4">
+            <!-- 자리표가 여기에 생성됩니다. -->
+        </div>
+
+        <div class="flex justify-center mt-8">
+            <button id="draw-button" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-full shadow-lg transition-transform transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50">
+                자리 뽑기
+            </button>
+        </div>
+
+        <div class="mt-8 p-4 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 rounded-lg">
+            <p class="font-bold">안내</p>
+            <p>같은 색상의 번호는 짝꿍입니다. 비어있는 자리는 회색으로 표시됩니다.</p>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const drawButton = document.getElementById('draw-button');
+            const seatMap = document.getElementById('seat-map');
+            const totalStudents = 26;
+            const totalSeats = 30;
+            const studentNumbers = Array.from({ length: totalStudents }, (_, i) => i + 1);
+
+            // 짝꿍을 위한 색상 배열
+            const colors = [
+                '#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4', '#3b82f6', '#6366f1',
+                '#8b5cf6', '#d946ef', '#ec4899', '#f43f5e', '#a855f7', '#10b981'
+            ];
+
+            // 학생 번호를 짝꿍 그룹에 매핑
+            const studentPairMap = new Map();
+            for (let i = 0; i < totalStudents; i++) {
+                const pairId = Math.floor(i / 2);
+                studentPairMap.set(studentNumbers[i], pairId);
+            }
+
+            const shuffle = (array) => {
+                let currentIndex = array.length, randomIndex;
+                while (currentIndex !== 0) {
+                    randomIndex = Math.floor(Math.random() * currentIndex);
+                    currentIndex--;
+                    [array[currentIndex], array[randomIndex]] = [array[randomIndex], array[currentIndex]];
+                }
+                return array;
+            };
+
+            const generateSeatMap = (shuffledNumbers) => {
+                seatMap.innerHTML = '';
+                const seatLayout = new Array(totalSeats);
+                
+                // 첫 24자리에 학생 배치
+                for (let i = 0; i < 24; i++) {
+                    seatLayout[i] = shuffledNumbers[i];
+                }
+                
+                // 마지막 행의 빈자리와 학생 배치
+                seatLayout[24] = null;
+                seatLayout[25] = null;
+                seatLayout[26] = shuffledNumbers[24];
+                seatLayout[27] = shuffledNumbers[25];
+                seatLayout[28] = null;
+                seatLayout[29] = null;
+
+                seatLayout.forEach((num) => {
+                    const seatElement = document.createElement('div');
+                    seatElement.classList.add('seat', 'rounded-lg', 'flex', 'items-center', 'justify-center');
+
+                    if (num === null) {
+                        seatElement.classList.add('empty-seat');
+                        seatElement.textContent = '빈자리';
+                    } else {
+                        seatElement.textContent = num;
+                        seatElement.classList.add('paired-seat');
+                        const pairId = studentPairMap.get(num);
+                        seatElement.style.backgroundColor = colors[pairId % colors.length];
+                    }
+
+                    seatMap.appendChild(seatElement);
+                });
+            };
+
+            drawButton.addEventListener('click', () => {
+                // 전체 학생 목록을 섞습니다.
+                const shuffledNumbers = shuffle([...studentNumbers]);
+                
+                // 5번 학생의 현재 위치를 찾습니다.
+                const index5 = shuffledNumbers.indexOf(5);
+                
+                // 5번이 배치될 수 있는 뒤쪽 자리(4행과 5행)의 인덱스 목록
+                // 이는 전체 26명의 학생 목록에서 뒤에서 8번째 자리(인덱스 18)부터 마지막 자리(인덱스 25)까지입니다.
+                const lastTwoRowsStartIndex = 18;
+                const lastTwoRowsEndIndex = 25;
+                const targetShuffledIndex = Math.floor(Math.random() * (lastTwoRowsEndIndex - lastTwoRowsStartIndex + 1)) + lastTwoRowsStartIndex;
+                
+                // 5번과 대상 자리에 있던 학생의 위치를 교환합니다.
+                [shuffledNumbers[index5], shuffledNumbers[targetShuffledIndex]] = [shuffledNumbers[targetShuffledIndex], shuffledNumbers[index5]];
+
+                generateSeatMap(shuffledNumbers);
+            });
+
+            // 초기 화면 생성
+            generateSeatMap(studentNumbers);
+        });
+    </script>
+</body>
+</html>
