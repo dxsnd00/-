@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>자리 뽑기</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+            position: relative;
+        }
+        .container {
+            max-width: 900px;
+            width: 100%;
+            background-color: #ffffff;
+            border-radius: 1rem;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            padding: 2rem;
+        }
+        .seat-row {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+        .seat-pair {
+            display: flex;
+            border-radius: 0.5rem;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .seat {
+            width: 80px;
+            height: 80px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #ffffff;
+            transition: transform 0.2s ease-in-out;
+            border: 2px solid rgba(0, 0, 0, 0.1);
+        }
+        .seat:hover {
+            transform: scale(1.05);
+        }
+        .empty-seat {
+            background-color: #e5e7eb;
+            color: #9ca3af;
+            font-size: 1rem;
+            border-style: dashed;
+        }
+        .countdown-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: white;
+            z-index: 100;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 10rem;
+            font-weight: bold;
+            color: #1f2937;
+            transition: opacity 0.5s ease-in-out;
+        }
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="text-3xl font-bold text-center mb-6 text-gray-800">자리 뽑기 프로그램</h1>
+        <p class="text-center text-gray-600 mb-8">버튼을 눌러서 자리를 랜덤으로 뽑아보세요!</p>
+
+        <div class="flex items-center justify-center mb-4">
+            <input type="checkbox" id="sound-toggle" class="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 rounded-lg" checked>
+            <label for="sound-toggle" class="text-gray-700 font-medium">효과음 재생</label>
+        </div>
+
+        <div id="seat-map" class="flex flex-col gap-4">
+            <!-- 자리표가 여기에 생성됩니다. -->
+        </div>
+
+        <div class="flex justify-center mt-8">
+            <button id="draw-button" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-full shadow-lg transition-transform transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50">
+                자리 뽑기
+            </button>
+        </div>
+
+        <div class="mt-8 p-4 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 rounded-lg">
+            <p class="font-bold">안내</p>
+            <p>같은 색상의 번호는 짝꿍입니다. 비어있는 자리는 회색으로 표시됩니다.</p>
+        </div>
+    </div>
+
+    <div id="countdown-overlay" class="countdown-overlay hidden">
+        <span id="countdown-display">3</span>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const drawButton = document.getElementById('draw-button');
+            const seatMap = document.getElementById('seat-map');
+            const soundToggle = document.getElementById('sound-toggle');
+            const countdownOverlay = document.getElementById('countdown-overlay');
+            const countdownDisplay = document.getElementById('countdown-display');
+
+            const totalStudents = 26;
+            const studentNumbers = Array.from({ length: totalStudents }, (_, i) => i + 1);
+
+            const colors = [
+                '#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4', '#3b82f6', '#6366f1',
+                '#8b5cf6', '#d946ef', '#ec4899', '#f43f5e', '#a855f7', '#10b981'
+            ];
+
+            const studentPairMap = new Map();
+            for (let i = 0; i < totalStudents; i++) {
+                const pairId = Math.floor(i / 2);
+                studentPairMap.set(studentNumbers[i], pairId);
+            }
+
+            const shuffle = (array) => {
+                let currentIndex = array.length, randomIndex;
+                while (currentIndex !== 0) {
+                    randomIndex = Math.floor(Math.random() * currentIndex);
+                    currentIndex--;
+                    [array[currentIndex], array[randomIndex]] = [array[randomIndex], array[currentIndex]];
+                }
+                return array;
+            };
+
+            const playBeepSound = () => {
+                if (soundToggle.checked) {
+                    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    const oscillator = audioContext.createOscillator();
+                    const gainNode = audioContext.createGain();
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioContext.destination);
+
+                    oscillator.type = 'sine';
+                    oscillator.frequency.value = 440;
+                    gainNode.gain.setValueAtTime(0.5, audioContext.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.3);
+                    oscillator.start(audioContext.currentTime);
+                    oscillator.stop(audioContext.currentTime + 0.3);
+                }
+            };
+
+            const generateSeatMap = (shuffledNumbers) => {
+                seatMap.innerHTML = '';
+                const seatLayout = new Array(30);
+
+                // 첫 24자리에 학생 배치
+                for (let i = 0; i < 24; i++) {
+                    seatLayout[i] = shuffledNumbers[i];
+                }
+
+                // 마지막 행의 빈자리와 학생 배치
+                seatLayout[24] = null;
+                seatLayout[25] = null;
+                seatLayout[26] = shuffledNumbers[24];
+                seatLayout[27] = shuffledNumbers[25];
+                seatLayout[28] = null;
+                seatLayout[29] = null;
+
+                const pairedStudents = [];
+                for(let i=0; i < seatLayout.length; i+=2) {
+                    if (seatLayout[i] === null && seatLayout[i+1] === null) {
+                        pairedStudents.push([null, null]);
+                    } else if (seatLayout[i] !== null && seatLayout[i+1] !== null) {
+                        pairedStudents.push([seatLayout[i], seatLayout[i+1]]);
+                    } else {
+                        // Handle the single seats in the last row
+                        pairedStudents.push([seatLayout[i], seatLayout[i+1]]);
+                    }
+                }
+                
+                let pairIndex = 0;
+                let seatIndex = 0;
+                
+                // 첫 4행 (6명씩)
+                for (let i = 0; i < 4; i++) {
+                    const rowDiv = document.createElement('div');
+                    rowDiv.classList.add('seat-row');
+                    for (let j = 0; j < 3; j++) {
+                        const pairDiv = document.createElement('div');
+                        pairDiv.classList.add('seat-pair');
+                        const pairId = studentPairMap.get(shuffledNumbers[pairIndex * 2]);
+                        const pairColor = colors[pairId % colors.length];
+                        pairDiv.style.backgroundColor = pairColor;
+                        
+                        const seat1 = document.createElement('div');
+                        seat1.classList.add('seat');
+                        seat1.textContent = shuffledNumbers[pairIndex * 2];
+                        pairDiv.appendChild(seat1);
+
+                        const seat2 = document.createElement('div');
+                        seat2.classList.add('seat');
+                        seat2.textContent = shuffledNumbers[pairIndex * 2 + 1];
+                        pairDiv.appendChild(seat2);
+
+                        rowDiv.appendChild(pairDiv);
+                        pairIndex++;
+                    }
+                    seatMap.appendChild(rowDiv);
+                }
+
+                // 마지막 5행 (2명만)
+                const lastRowDiv = document.createElement('div');
+                lastRowDiv.classList.add('seat-row');
+                for (let j = 0; j < 3; j++) {
+                    if (j === 1) { // 가운데 자리만 학생 배치
+                        const pairDiv = document.createElement('div');
+                        pairDiv.classList.add('seat-pair');
+                        const pairId = studentPairMap.get(shuffledNumbers[pairIndex * 2]);
+                        const pairColor = colors[pairId % colors.length];
+                        pairDiv.style.backgroundColor = pairColor;
+                        
+                        const seat1 = document.createElement('div');
+                        seat1.classList.add('seat');
+                        seat1.textContent = shuffledNumbers[pairIndex * 2];
+                        pairDiv.appendChild(seat1);
+
+                        const seat2 = document.createElement('div');
+                        seat2.classList.add('seat');
+                        seat2.textContent = shuffledNumbers[pairIndex * 2 + 1];
+                        pairDiv.appendChild(seat2);
+
+                        lastRowDiv.appendChild(pairDiv);
+                        pairIndex++;
+                    } else { // 빈자리
+                        const empty1 = document.createElement('div');
+                        empty1.classList.add('seat', 'empty-seat');
+                        empty1.textContent = '빈자리';
+                        lastRowDiv.appendChild(empty1);
+                        const empty2 = document.createElement('div');
+                        empty2.classList.add('seat', 'empty-seat');
+                        empty2.textContent = '빈자리';
+                        lastRowDiv.appendChild(empty2);
+                    }
+                }
+                seatMap.appendChild(lastRowDiv);
+            };
+
+            const startCountdown = (shuffledNumbers) => {
+                drawButton.disabled = true;
+                countdownOverlay.classList.remove('hidden');
+                let count = 3;
+
+                const countdownInterval = setInterval(() => {
+                    countdownDisplay.textContent = count;
+                    playBeepSound();
+                    if (count === 0) {
+                        clearInterval(countdownInterval);
+                        countdownOverlay.classList.add('hidden');
+                        generateSeatMap(shuffledNumbers);
+                        drawButton.disabled = false;
+                    }
+                    count--;
+                }, 1000);
+            };
+
+            drawButton.addEventListener('click', () => {
+                const shuffledNumbers = shuffle([...studentNumbers]);
+                
+                // 5번 학생의 현재 위치를 찾습니다.
+                const index5 = shuffledNumbers.indexOf(5);
+                
+                // 5번이 배치될 수 있는 뒤쪽 자리(4행과 5행)의 인덱스 목록
+                // 이는 전체 26명의 학생 목록에서 뒤에서 8번째 자리(인덱스 18)부터 마지막 자리(인덱스 25)까지입니다.
+                const lastTwoRowsStartIndex = 18;
+                const lastTwoRowsEndIndex = 25;
+                const targetShuffledIndex = Math.floor(Math.random() * (lastTwoRowsEndIndex - lastTwoRowsStartIndex + 1)) + lastTwoRowsStartIndex;
+                
+                // 5번과 대상 자리에 있던 학생의 위치를 교환합니다.
+                [shuffledNumbers[index5], shuffledNumbers[targetShuffledIndex]] = [shuffledNumbers[targetShuffledIndex], shuffledNumbers[index5]];
+
+                if (soundToggle.checked) {
+                    startCountdown(shuffledNumbers);
+                } else {
+                    generateSeatMap(shuffledNumbers);
+                }
+            });
+
+            // 초기 화면 생성
+            generateSeatMap(studentNumbers);
+        });
+    </script>
+</body>
+</html>
